@@ -1,0 +1,70 @@
+# PERCEPT Configuration
+# Pipeline for Entity Recognition, Classification, Extraction, and Persistence Tracking
+
+framework:
+  name: "PERCEPT"
+  version: "0.1.0"
+
+cameras:
+  - id: "cam_front"
+    type: "realsense_d455"
+    serial: ""  # Auto-detect if empty
+    resolution: [640, 480]
+    fps: 30
+    enabled: true
+
+segmentation:
+  primary_method: "fastsam"
+  fallback_methods: ["depth_discontinuity", "point_cloud_clustering"]
+  fusion_enabled: true
+  min_object_pixels: 500
+  max_objects_per_frame: 50
+
+reid:
+  person_model: "repvgg_a0_512"
+  embedding_dimension: 512
+  match_threshold_same_camera: 0.3
+  match_threshold_cross_camera: 0.25
+  gallery_max_embeddings_per_object: 10
+  reid_interval_frames: 3
+
+tracking:
+  algorithm: "bytetrack"
+  lost_track_buffer_frames: 30
+  min_track_confidence: 0.5
+
+classification:
+  confidence_confirmed: 0.85
+  confidence_provisional: 0.5
+  reprocess_interval_seconds: 60
+
+normalization:
+  enable_light_correction: true
+  enable_color_correction: true
+  clahe_clip_limit: 2.0
+
+human_review:
+  enabled: true
+  queue_low_confidence: true
+  review_threshold: 0.5
+
+database:
+  path: "data/percept.db"
+  embedding_index_type: "hnsw"
+
+performance:
+  adaptive_processing: true
+  target_fps: 15
+  skip_frames_when_behind: true
+  max_processing_time_ms: 100
+
+ui:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8080
+  debug: false
+
+logging:
+  level: "INFO"
+  file: "logs/percept.log"
+  console: true
