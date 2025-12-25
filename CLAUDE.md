@@ -83,7 +83,7 @@ rs-enumerate-devices
 
 ## Implementation Status
 
-**Phase 1: Foundation** - IN PROGRESS (Core complete, capture/persistence pending)
+**Phase 1: Foundation** - NEARLY COMPLETE (RealSense capture pending)
 - [x] Project structure setup
 - [x] Configuration system (`percept/core/config.py`)
 - [x] Pipeline base classes and module interface (`percept/core/pipeline.py`)
@@ -91,8 +91,9 @@ rs-enumerate-devices
 - [x] ObjectSchema and Classification types (`percept/core/schema.py`)
 - [x] Test framework setup with fixtures (`tests/conftest.py`)
 - [x] Unit tests for core modules (111 tests passing)
+- [x] Database schema and operations (`percept/persistence/database.py`)
+- [x] Unit tests for persistence (28 tests)
 - [ ] Multi-camera RealSense capture
-- [ ] Database schema and basic operations
 
 **Phase 2-8:** Not started
 
@@ -121,17 +122,23 @@ rs-enumerate-devices
    - `PipelineData` flexible container for pipeline data
    - `DataAdapter` with image resize, color space, dtype conversions
 
-5. Set up testing infrastructure:
+5. Implemented `percept/persistence/database.py`:
+   - `PerceptDatabase` class with full CRUD for ObjectSchemas
+   - Trajectory storage and retrieval
+   - Human review queue with pending/reviewed/skipped workflow
+   - Embedding-specific operations for FAISS sync
+
+6. Set up testing infrastructure:
    - Enhanced `tests/conftest.py` with fixtures for all core types
    - `MockPipelineModule` for testing pipeline behavior
-   - Unit tests: `test_schema.py`, `test_config.py`, `test_pipeline.py`, `test_adapter.py`
+   - Unit tests: `test_schema.py`, `test_config.py`, `test_pipeline.py`, `test_adapter.py`, `test_database.py`
 
-**Test Results:** 111 tests passing
+**Test Results:** 139 tests passing
 
 **Next Steps:**
 1. Implement `percept/capture/realsense.py` - Multi-camera RealSense capture
-2. Implement `percept/persistence/database.py` - SQLite operations
-3. Complete Phase 1 remaining items
+2. Complete Phase 1
+3. Begin Phase 2: Segmentation Layer
 
 ## Architecture Summary
 
