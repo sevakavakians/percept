@@ -83,16 +83,55 @@ rs-enumerate-devices
 
 ## Implementation Status
 
-**Phase 1: Foundation** - NOT STARTED
-- [ ] Project structure setup ✓ (done)
-- [ ] Configuration system
-- [ ] Pipeline base classes and module interface
-- [ ] Data adapter framework
+**Phase 1: Foundation** - IN PROGRESS (Core complete, capture/persistence pending)
+- [x] Project structure setup
+- [x] Configuration system (`percept/core/config.py`)
+- [x] Pipeline base classes and module interface (`percept/core/pipeline.py`)
+- [x] Data adapter framework (`percept/core/adapter.py`)
+- [x] ObjectSchema and Classification types (`percept/core/schema.py`)
+- [x] Test framework setup with fixtures (`tests/conftest.py`)
+- [x] Unit tests for core modules (111 tests passing)
 - [ ] Multi-camera RealSense capture
 - [ ] Database schema and basic operations
-- [ ] Test framework setup
 
-Next step: Implement `percept/core/` modules (schema.py, pipeline.py, adapter.py, config.py)
+**Phase 2-8:** Not started
+
+### Session Log: December 24, 2025
+
+**Completed:**
+1. Implemented `percept/core/schema.py`:
+   - `ObjectSchema` dataclass with full serialization (JSON roundtrip)
+   - `ClassificationStatus` enum (CONFIRMED, PROVISIONAL, NEEDS_REVIEW, UNCLASSIFIED)
+   - `Detection` and `ObjectMask` helper classes
+   - Automatic L2 normalization of ReID embeddings
+
+2. Implemented `percept/core/config.py`:
+   - YAML-based configuration loading
+   - Typed dataclasses for all config sections
+   - Config validation, save/reload, hot-reload support
+
+3. Implemented `percept/core/pipeline.py`:
+   - `PipelineModule` abstract base class for hot-swappable modules
+   - `Pipeline` orchestration with automatic data adaptation
+   - `PipelineRegistry` for dynamic pipeline construction
+   - Timing collection and intermediate output caching
+
+4. Implemented `percept/core/adapter.py`:
+   - `DataSpec` for describing data requirements
+   - `PipelineData` flexible container for pipeline data
+   - `DataAdapter` with image resize, color space, dtype conversions
+
+5. Set up testing infrastructure:
+   - Enhanced `tests/conftest.py` with fixtures for all core types
+   - `MockPipelineModule` for testing pipeline behavior
+   - Unit tests: `test_schema.py`, `test_config.py`, `test_pipeline.py`, `test_adapter.py`
+
+**Test Results:** 111 tests passing
+
+**Next Steps:**
+1. Implement `percept/capture/realsense.py` - Multi-camera RealSense capture
+2. Implement `percept/persistence/database.py` - SQLite operations
+3. Complete Phase 1 remaining items
 
 ## Architecture Summary
 
