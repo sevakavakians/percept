@@ -83,17 +83,20 @@ rs-enumerate-devices
 
 ## Implementation Status
 
-**Phase 1: Foundation** - NEARLY COMPLETE (RealSense capture pending)
+**Phase 1: Foundation** - COMPLETE
 - [x] Project structure setup
 - [x] Configuration system (`percept/core/config.py`)
 - [x] Pipeline base classes and module interface (`percept/core/pipeline.py`)
 - [x] Data adapter framework (`percept/core/adapter.py`)
 - [x] ObjectSchema and Classification types (`percept/core/schema.py`)
 - [x] Test framework setup with fixtures (`tests/conftest.py`)
-- [x] Unit tests for core modules (111 tests passing)
+- [x] Unit tests for core modules (111 tests)
 - [x] Database schema and operations (`percept/persistence/database.py`)
 - [x] Unit tests for persistence (28 tests)
-- [ ] Multi-camera RealSense capture
+- [x] Multi-camera RealSense capture (`percept/capture/realsense.py`)
+- [x] Unit tests for capture (15 tests)
+
+**Total: 154 tests passing**
 
 **Phase 2-8:** Not started
 
@@ -128,17 +131,29 @@ rs-enumerate-devices
    - Human review queue with pending/reviewed/skipped workflow
    - Embedding-specific operations for FAISS sync
 
-6. Set up testing infrastructure:
+6. Implemented `percept/capture/realsense.py`:
+   - `RealSenseCamera` class for single camera capture
+   - `MultiCameraCapture` for managing multiple cameras
+   - `FrameData` container with conversion to PipelineData
+   - `CameraIntrinsics` with camera matrix generation
+   - Graceful handling when pyrealsense2 not available
+
+7. Set up testing infrastructure:
    - Enhanced `tests/conftest.py` with fixtures for all core types
    - `MockPipelineModule` for testing pipeline behavior
-   - Unit tests: `test_schema.py`, `test_config.py`, `test_pipeline.py`, `test_adapter.py`, `test_database.py`
+   - `MockRealSenseCamera` for testing without hardware
+   - Unit tests: `test_schema.py`, `test_config.py`, `test_pipeline.py`, `test_adapter.py`, `test_database.py`, `test_capture.py`
 
-**Test Results:** 139 tests passing
+**Test Results:** 154 tests passing
+
+**Phase 1 Complete!**
 
 **Next Steps:**
-1. Implement `percept/capture/realsense.py` - Multi-camera RealSense capture
-2. Complete Phase 1
-3. Begin Phase 2: Segmentation Layer
+1. Begin Phase 2: Segmentation Layer
+   - FastSAM integration with Hailo-8
+   - Depth discontinuity segmentation
+   - Point cloud clustering
+   - Segmentation fusion
 
 ## Architecture Summary
 
