@@ -1,7 +1,7 @@
 # PERCEPT Implementation Progress
 
-**Last Updated:** December 25, 2025
-**Total Tests:** 365 passing
+**Last Updated:** January 3, 2026
+**Total Tests:** 435 passing
 
 ---
 
@@ -13,7 +13,7 @@
 | 2 | Segmentation Layer | ✅ COMPLETE | 51 |
 | 3 | Tracking & ReID | ✅ COMPLETE | 92 |
 | 4 | Classification Pipelines | ✅ COMPLETE | 68 |
-| 5 | Persistence & Review | ⏳ Not Started | - |
+| 5 | Persistence & Review | ✅ COMPLETE | 70 |
 | 6 | Integration & Testing | ⏳ Not Started | - |
 | 7 | Pipeline Visualization UI | ⏳ Not Started | - |
 | 8 | Polish & Documentation | ⏳ Not Started | - |
@@ -275,12 +275,79 @@ Detection
 
 ---
 
-## Phase 5: Persistence & Review ⏳ NOT STARTED
+## Phase 5: Persistence & Review ✅ COMPLETE
 
-Database layer is complete. Remaining:
-- Embedding store with FAISS index sync
-- Human review UI integration
-- Active learning feedback loop
+### Goals
+- Persistent embedding storage with FAISS sync
+- Human review system with confidence-based routing
+- Active learning for model improvement
+
+### Implemented Modules
+
+| Module | File | Description |
+|--------|------|-------------|
+| EmbeddingStoreConfig | `percept/persistence/embedding_store.py` | Configuration for embedding persistence |
+| EmbeddingRecord | `percept/persistence/embedding_store.py` | Record with embedding and metadata |
+| EmbeddingStore | `percept/persistence/embedding_store.py` | FAISS-backed persistent storage with DB sync |
+| CameraAwareEmbeddingStore | `percept/persistence/embedding_store.py` | Camera-aware matching thresholds |
+| ReviewStatus | `percept/persistence/review.py` | Enum: PENDING, IN_PROGRESS, REVIEWED, SKIPPED |
+| ReviewReason | `percept/persistence/review.py` | Enum: LOW_CONFIDENCE, AMBIGUOUS_CLASS, etc. |
+| ReviewPriority | `percept/persistence/review.py` | Enum: LOW, NORMAL, HIGH, URGENT |
+| ConfidenceConfig | `percept/persistence/review.py` | Thresholds for auto-confirm/provisional/review |
+| ReviewItem | `percept/persistence/review.py` | Complete review item with alternatives |
+| ReviewResult | `percept/persistence/review.py` | Result of human review |
+| CropManager | `percept/persistence/review.py` | Image crop storage management |
+| ConfidenceRouter | `percept/persistence/review.py` | Routes objects based on confidence |
+| HumanReviewQueue | `percept/persistence/review.py` | Queue management with callbacks |
+| BatchReviewer | `percept/persistence/review.py` | Batch review operations |
+| FeedbackEntry | `percept/persistence/active_learning.py` | Feedback from human review |
+| AccuracyMetrics | `percept/persistence/active_learning.py` | Precision, recall, confusion matrix |
+| TrainingExample | `percept/persistence/active_learning.py` | Training data for model improvement |
+| FeedbackCollector | `percept/persistence/active_learning.py` | Collect and persist feedback |
+| AccuracyTracker | `percept/persistence/active_learning.py` | Track model accuracy over time |
+| TrainingDataExporter | `percept/persistence/active_learning.py` | Export training data (JSON/CSV) |
+| ActiveLearningManager | `percept/persistence/active_learning.py` | Orchestrate feedback and training |
+
+### Test Files
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `tests/unit/test_persistence.py` | 70 | Embedding store, review, active learning |
+
+### Key Design Decisions
+
+1. **FAISS + SQLite sync** - In-memory FAISS for fast search, SQLite for persistence
+2. **Confidence routing** - Auto-confirm (>0.85), provisional (0.5-0.85), review (<0.5)
+3. **Camera-aware thresholds** - Different distance thresholds for same vs cross-camera
+4. **Crop management** - Saves image crops for review, auto-cleanup old files
+5. **Callback architecture** - Review completion triggers active learning updates
+6. **Uncertainty sampling** - Prioritize low-confidence objects for review
+7. **Class balancing** - Training data export with class balancing
+8. **Accuracy tracking** - Rolling window accuracy with alerts
+
+### Architecture
+
+```
+Objects
+    │
+    ├─→ EmbeddingStore ─→ FAISS Index ─→ SQLite Sync
+    │                          │
+    └─→ ConfidenceRouter ──────┤
+             │                 │
+             ├─→ CONFIRMED ────┤
+             ├─→ PROVISIONAL ──┤
+             └─→ NEEDS_REVIEW ─┼─→ HumanReviewQueue
+                               │          │
+                               │          ├─→ CropManager
+                               │          │
+                               │          └─→ ReviewResult
+                               │                  │
+                               └──────────────────┼─→ ActiveLearningManager
+                                                  │          │
+                                                  │          ├─→ FeedbackCollector
+                                                  │          ├─→ AccuracyTracker
+                                                  │          └─→ TrainingDataExporter
+```
 
 ---
 
@@ -344,8 +411,9 @@ python -c "from percept.segmentation import *; print('Segmentation OK')"
 ## Git History
 
 ```
-[pending] Complete Phase 4: Add classification pipelines
-[pending] Complete Phase 3: Add tracking and ReID layer
+[pending] Complete Phase 5: Add persistence and review layer
+4630032 Complete Phase 4: Add classification pipelines
+e27b478 Complete Phase 3: Add tracking and ReID layer
 6d32cfc Complete Phase 2: Add segmentation layer
 14180aa Complete Phase 1: Add RealSense multi-camera capture
 94580f5 Add database persistence layer with full CRUD and review queue
