@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex justify-between items-center" style="margin-bottom: 1.5rem;">
+    <h1>Configuration Editor</h1>
+    <div class="flex gap-2">
+        <button class="btn btn-secondary" onclick="config.validate()">Validate</button>
+        <button class="btn btn-primary" onclick="config.save()">Save & Apply</button>
+    </div>
+</div>
+
+<!-- Config Editor -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">percept_config.yaml</h2>
+    </div>
+    <div class="card-body">
+        <div class="code-editor">
+            <textarea id="config-editor" spellcheck="false">Loading configuration...</textarea>
+        </div>
+    </div>
+</div>
+
+<!-- Config Sections -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Quick Settings</h2>
+    </div>
+    <div class="card-body">
+        <div class="form-group">
+            <label class="form-label">Segmentation Model</label>
+            <select class="form-input form-select">
+                <option>FastSAM (Hailo-8)</option>
+                <option>Depth Only</option>
+                <option>Point Cloud</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">ReID Match Threshold</label>
+            <input type="range" min="0" max="1" step="0.05" value="0.5" class="form-input">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Review Confidence Threshold</label>
+            <input type="range" min="0" max="1" step="0.05" value="0.5" class="form-input">
+        </div>
+    </div>
+</div>
+
+<!-- Validation Results -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Validation</h2>
+    </div>
+    <div class="card-body" id="validation-results">
+        <p class="text-muted">Click "Validate" to check configuration</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        config.load();
+    });
+</script>
+{% endblock %}

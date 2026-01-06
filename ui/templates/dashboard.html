@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="margin-bottom: 1.5rem;">Dashboard</h1>
+
+<!-- Stats Grid -->
+<div class="stats-grid" style="margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div class="stat-value" id="stat-fps">--</div>
+        <div class="stat-label">FPS</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-objects">--</div>
+        <div class="stat-label">Total Objects</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-pending">--</div>
+        <div class="stat-label">Pending Review</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-cpu">--</div>
+        <div class="stat-label">CPU Usage</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-memory">--</div>
+        <div class="stat-label">Memory Usage</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-queue">--</div>
+        <div class="stat-label">Queue Depth</div>
+    </div>
+</div>
+
+<!-- Camera Feeds -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Camera Feeds</h2>
+    </div>
+    <div class="card-body">
+        <div id="camera-grid" class="camera-grid">
+            <p class="text-muted">Loading cameras...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Alerts -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">System Alerts</h2>
+    </div>
+    <div class="card-body" id="alerts">
+        <p class="text-muted">No active alerts</p>
+    </div>
+</div>
+{% endblock %}

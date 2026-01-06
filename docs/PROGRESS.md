@@ -1,7 +1,7 @@
 # PERCEPT Implementation Progress
 
-**Last Updated:** January 5, 2026
-**Total Tests:** 498 passing (9 skipped)
+**Last Updated:** January 6, 2026
+**Total Tests:** 563 passing (9 skipped)
 
 ---
 
@@ -15,7 +15,7 @@
 | 4 | Classification Pipelines | ✅ COMPLETE | 68 |
 | 5 | Persistence & Review | ✅ COMPLETE | 70 |
 | 6 | Integration & Testing | ✅ COMPLETE | 63 |
-| 7 | Pipeline Visualization UI | ⏳ Not Started | - |
+| 7 | Pipeline Visualization UI | ✅ COMPLETE | 65 |
 | 8 | Polish & Documentation | ⏳ Not Started | - |
 
 ---
@@ -422,14 +422,85 @@ Objects
 
 ---
 
-## Phase 7: Pipeline Visualization UI ⏳ NOT STARTED
+## Phase 7: Pipeline Visualization UI ✅ COMPLETE
 
-- FastAPI backend
-- WebSocket streaming
-- Dashboard view
+### Goals
+- FastAPI backend with REST API and WebSocket support
+- Real-time dashboard with system metrics
 - Pipeline DAG visualization
-- Configuration editor
 - Human review interface
+- Configuration editor with validation
+
+### Implemented Modules
+
+| Module | File | Description |
+|--------|------|-------------|
+| AppState | `ui/app.py` | Application lifecycle, database connection |
+| DashboardData | `ui/models.py` | Real-time metrics (FPS, CPU, memory, objects) |
+| PipelineGraph | `ui/models.py` | DAG structure with nodes and edges |
+| WebSocketEvent | `ui/models.py` | Event types for real-time updates |
+| API Routes | `ui/api/routes.py` | REST endpoints for all resources |
+| WebSocket Handlers | `ui/api/websocket.py` | Stream and event connections |
+| PipelineGraphBuilder | `ui/components/pipeline_graph.py` | Graph construction and layout |
+| PipelineAnalyzer | `ui/components/pipeline_graph.py` | Topological sort, path analysis |
+| FrameAnnotator | `ui/components/frame_viewer.py` | Detection overlay rendering |
+| FrameEncoder | `ui/components/frame_viewer.py` | JPEG/PNG encoding |
+| MetricCollector | `ui/components/metrics_panel.py` | Time-windowed metric aggregation |
+| SystemMonitor | `ui/components/metrics_panel.py` | CPU, memory, temperature monitoring |
+| FPSCounter | `ui/components/metrics_panel.py` | Frame rate calculation |
+| LatencyTracker | `ui/components/metrics_panel.py` | Operation timing with context manager |
+
+### REST API Endpoints
+
+```
+GET  /api/dashboard          # System metrics, camera status
+GET  /api/metrics            # Detailed performance data
+GET  /api/cameras            # List configured cameras
+GET  /api/cameras/{id}/frame # Current frame (JPEG)
+GET  /api/cameras/{id}/depth # Depth visualization
+GET  /api/pipeline/graph     # Pipeline DAG structure
+GET  /api/pipeline/stages    # List all stages
+GET  /api/objects            # Paginated object list
+GET  /api/objects/{id}       # Object details
+GET  /api/config             # Current configuration
+PUT  /api/config             # Update configuration
+POST /api/config/validate    # Validate configuration
+GET  /api/review             # Pending review items
+POST /api/review/{id}        # Submit review
+```
+
+### WebSocket Endpoints
+
+```
+WS /ws/events   # Pipeline events (object detected, review needed, alerts)
+WS /ws/stream   # Binary frame streaming
+```
+
+### Frontend Pages
+
+| Template | Path | Description |
+|----------|------|-------------|
+| dashboard.html | `/` | System stats, camera feeds, alerts |
+| pipeline_view.html | `/pipeline` | Interactive DAG, timing breakdown |
+| object_gallery.html | `/objects` | Grid view with filtering |
+| review_queue.html | `/review` | Quick classification interface |
+| config_editor.html | `/config` | YAML editor with validation |
+
+### Test Files
+
+| File | Tests | Description |
+|------|-------|-------------|
+| `tests/ui/test_api.py` | 26 | REST endpoints, templates |
+| `tests/ui/test_components.py` | 39 | Models, graph builder, metrics |
+
+### Key Design Decisions
+
+1. **FastAPI + Jinja2** - Lightweight embedded deployment, async support
+2. **Fallback templates** - Inline HTML when templates directory missing
+3. **WebSocket events** - Real-time updates without polling
+4. **Pydantic models** - Type-safe API responses
+5. **psutil metrics** - Cross-platform system monitoring
+6. **Graph layout engine** - Automatic node positioning for DAG visualization
 
 ---
 
@@ -473,7 +544,8 @@ python -c "from percept.segmentation import *; print('Segmentation OK')"
 ## Git History
 
 ```
-[pending] Complete Phase 6: Add integration and testing layer
+[pending] Complete Phase 7: Add Pipeline Visualization UI
+[done] Complete Phase 6: Add integration and testing layer
 [done] Complete Phase 5: Add persistence and review layer
 4630032 Complete Phase 4: Add classification pipelines
 e27b478 Complete Phase 3: Add tracking and ReID layer

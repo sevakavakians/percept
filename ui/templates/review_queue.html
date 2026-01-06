@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex justify-between items-center" style="margin-bottom: 1.5rem;">
+    <h1>Review Queue</h1>
+    <button class="btn btn-secondary" onclick="review.load()">Refresh</button>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid" style="margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div class="stat-value" id="review-pending">--</div>
+        <div class="stat-label">Pending</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="review-today">--</div>
+        <div class="stat-label">Reviewed Today</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="review-accuracy">--</div>
+        <div class="stat-label">Model Accuracy</div>
+    </div>
+</div>
+
+<!-- Review Items -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Items Needing Review</h2>
+    </div>
+    <div class="card-body">
+        <div id="review-grid" class="review-grid">
+            <p class="text-muted">Loading review queue...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Keyboard Shortcuts -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Keyboard Shortcuts</h2>
+    </div>
+    <div class="card-body">
+        <table class="table">
+            <tr><td><code>Enter</code></td><td>Confirm current classification</td></tr>
+            <tr><td><code>Space</code></td><td>Skip item</td></tr>
+            <tr><td><code>1-9</code></td><td>Quick select class</td></tr>
+            <tr><td><code>Arrow keys</code></td><td>Navigate items</td></tr>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        review.load();
+    });
+</script>
+{% endblock %}

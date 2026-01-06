@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="margin-bottom: 1.5rem;">Pipeline View</h1>
+
+<!-- Pipeline Graph -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Processing Pipeline</h2>
+        <div class="flex gap-2">
+            <span class="status-dot active"></span>
+            <span class="text-sm">Active</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="pipeline-container">
+            <div id="pipeline-graph" class="pipeline-graph">
+                <p class="text-muted">Loading pipeline...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stage Details -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Stage Output</h2>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">Click a pipeline stage to view its output</p>
+        <div id="stage-output"></div>
+    </div>
+</div>
+
+<!-- Timing Breakdown -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Processing Times</h2>
+    </div>
+    <div class="card-body">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Stage</th>
+                    <th>Latency</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="timing-table">
+                <tr>
+                    <td>Capture</td>
+                    <td>0.5 ms</td>
+                    <td><span class="status-dot active"></span> Running</td>
+                </tr>
+                <tr>
+                    <td>Segmentation</td>
+                    <td>30.0 ms</td>
+                    <td><span class="status-dot active"></span> Running</td>
+                </tr>
+                <tr>
+                    <td>Tracking</td>
+                    <td>3.0 ms</td>
+                    <td><span class="status-dot active"></span> Running</td>
+                </tr>
+                <tr>
+                    <td>ReID</td>
+                    <td>5.0 ms</td>
+                    <td><span class="status-dot active"></span> Running</td>
+                </tr>
+                <tr>
+                    <td>Classification</td>
+                    <td>20.0 ms</td>
+                    <td><span class="status-dot active"></span> Running</td>
+                </tr>
+                <tr>
+                    <td>Database</td>
+                    <td>5.0 ms</td>
+                    <td><span class="status-dot active"></span> Running</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        pipeline.load();
+    });
+</script>
+{% endblock %}

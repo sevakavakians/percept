@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex justify-between items-center" style="margin-bottom: 1.5rem;">
+    <h1>Object Gallery</h1>
+    <div class="flex gap-2">
+        <select class="form-input form-select" style="width: 150px;" id="class-filter">
+            <option value="">All Classes</option>
+            <option value="person">Person</option>
+            <option value="car">Car</option>
+            <option value="truck">Truck</option>
+            <option value="bicycle">Bicycle</option>
+        </select>
+        <button class="btn btn-secondary" onclick="objects.load()">Refresh</button>
+    </div>
+</div>
+
+<!-- Object Grid -->
+<div class="card">
+    <div class="card-body">
+        <div id="object-grid" class="object-grid">
+            <p class="text-muted">Loading objects...</p>
+        </div>
+        <div id="pagination" class="flex justify-between items-center mt-4"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        objects.load();
+
+        document.getElementById('class-filter').addEventListener('change', (e) => {
+            const classFilter = e.target.value;
+            // Would pass filter to API
+            objects.load(1);
+        });
+    });
+</script>
+{% endblock %}
