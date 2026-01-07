@@ -9,7 +9,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,6 +34,7 @@ class AppState:
         self.config: Optional[PerceptConfig] = None
         self.database = None
         self.pipeline = None
+        self.cameras: Dict[str, Any] = {}  # camera_id -> RealSenseCamera
         self.start_time: datetime = datetime.now()
         self.frame_count: int = 0
         self.connected_clients: set = set()
@@ -59,9 +60,35 @@ class AppState:
                 print(f"Warning: Could not initialize database: {e}")
                 self.database = None
 
+            # Initialize cameras
+            try:
+                from percept.capture.realsense import RealSenseCamera, REALSENSE_AVAILABLE
+                if REALSENSE_AVAILABLE and self.config.cameras:
+                    for cam_cfg in self.config.get_enabled_cameras():
+                        try:
+                            camera = RealSenseCamera.from_config(cam_cfg)
+                            camera.start()
+                            self.cameras[cam_cfg.id] = camera
+                            print(f"Camera '{cam_cfg.id}' started successfully")
+                        except Exception as e:
+                            print(f"Warning: Could not start camera '{cam_cfg.id}': {e}")
+                else:
+                    print("RealSense not available or no cameras configured")
+            except Exception as e:
+                print(f"Warning: Could not initialize cameras: {e}")
+
     async def shutdown(self):
         """Cleanup on shutdown."""
         async with self._lock:
+            # Stop cameras
+            for camera_id, camera in self.cameras.items():
+                try:
+                    camera.stop()
+                    print(f"Camera '{camera_id}' stopped")
+                except Exception as e:
+                    print(f"Warning: Error stopping camera '{camera_id}': {e}")
+            self.cameras.clear()
+
             if self.database:
                 self.database.close()
 

@@ -154,15 +154,17 @@ async def get_metrics(state=Depends(get_app_state)):
 # =============================================================================
 
 @router.get("/cameras", response_model=List[CameraStatus])
-async def list_cameras(config=Depends(get_config)):
+async def list_cameras(config=Depends(get_config), state=Depends(get_app_state)):
     """List all configured cameras."""
     cameras = []
     if config and config.cameras:
         for cam_cfg in config.cameras:
+            # Check if camera is actually connected and running
+            is_connected = cam_cfg.id in state.cameras
             cameras.append(CameraStatus(
                 id=cam_cfg.id,
                 name=cam_cfg.id,
-                connected=cam_cfg.enabled,
+                connected=is_connected,
                 fps=float(cam_cfg.fps),
                 resolution=cam_cfg.resolution,
             ))
@@ -170,39 +172,72 @@ async def list_cameras(config=Depends(get_config)):
 
 
 @router.get("/cameras/{camera_id}/frame")
-async def get_camera_frame(camera_id: str):
+async def get_camera_frame(camera_id: str, state=Depends(get_app_state)):
     """Get current frame from camera as JPEG."""
-    # Generate placeholder image
-    try:
-        import cv2
-        img = np.zeros((480, 640, 3), dtype=np.uint8)
-        cv2.putText(
-            img, f"Camera: {camera_id}",
-            (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2
-        )
-        cv2.putText(
-            img, datetime.now().strftime("%H:%M:%S"),
-            (250, 280), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (128, 128, 128), 1
-        )
-        _, jpeg = cv2.imencode('.jpg', img)
-        return Response(content=jpeg.tobytes(), media_type="image/jpeg")
-    except ImportError:
-        raise HTTPException(status_code=503, detail="OpenCV not available")
+    import cv2
+
+    # Try to get frame from actual camera
+    if camera_id in state.cameras:
+        try:
+            camera = state.cameras[camera_id]
+            frame_data = camera.capture(timeout_ms=1000)
+            if frame_data.color is not None:
+                state.frame_count += 1
+                _, jpeg = cv2.imencode('.jpg', frame_data.color, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                return Response(content=jpeg.tobytes(), media_type="image/jpeg")
+        except Exception as e:
+            logger.warning(f"Error capturing frame from camera '{camera_id}': {e}")
+
+    # Fallback to placeholder if camera not available
+    img = np.zeros((480, 640, 3), dtype=np.uint8)
+    cv2.putText(
+        img, f"Camera: {camera_id}",
+        (50, 220), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2
+    )
+    cv2.putText(
+        img, "No signal" if camera_id not in state.cameras else "Capture error",
+        (200, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2
+    )
+    cv2.putText(
+        img, datetime.now().strftime("%H:%M:%S"),
+        (250, 300), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (128, 128, 128), 1
+    )
+    _, jpeg = cv2.imencode('.jpg', img)
+    return Response(content=jpeg.tobytes(), media_type="image/jpeg")
 
 
 @router.get("/cameras/{camera_id}/depth")
-async def get_camera_depth(camera_id: str):
+async def get_camera_depth(camera_id: str, state=Depends(get_app_state)):
     """Get depth visualization from camera."""
-    try:
-        import cv2
-        # Generate colorized depth placeholder
-        depth = np.random.uniform(0.5, 5.0, (480, 640)).astype(np.float32)
-        depth_norm = ((depth - 0.5) / 4.5 * 255).astype(np.uint8)
-        depth_color = cv2.applyColorMap(depth_norm, cv2.COLORMAP_JET)
-        _, jpeg = cv2.imencode('.jpg', depth_color)
-        return Response(content=jpeg.tobytes(), media_type="image/jpeg")
-    except ImportError:
-        raise HTTPException(status_code=503, detail="OpenCV not available")
+    import cv2
+
+    # Try to get depth from actual camera
+    if camera_id in state.cameras:
+        try:
+            camera = state.cameras[camera_id]
+            frame_data = camera.capture(timeout_ms=1000)
+            if frame_data.depth is not None:
+                # Normalize depth to 0-255 range (assuming 0.1m to 10m range)
+                depth_clipped = np.clip(frame_data.depth, 0.1, 10.0)
+                depth_norm = ((depth_clipped - 0.1) / 9.9 * 255).astype(np.uint8)
+                depth_color = cv2.applyColorMap(depth_norm, cv2.COLORMAP_JET)
+                _, jpeg = cv2.imencode('.jpg', depth_color, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                return Response(content=jpeg.tobytes(), media_type="image/jpeg")
+        except Exception as e:
+            logger.warning(f"Error capturing depth from camera '{camera_id}': {e}")
+
+    # Fallback to placeholder
+    img = np.zeros((480, 640, 3), dtype=np.uint8)
+    cv2.putText(
+        img, f"Depth: {camera_id}",
+        (50, 220), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2
+    )
+    cv2.putText(
+        img, "No depth data",
+        (200, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2
+    )
+    _, jpeg = cv2.imencode('.jpg', img)
+    return Response(content=jpeg.tobytes(), media_type="image/jpeg")
 
 
 # =============================================================================
