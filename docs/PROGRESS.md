@@ -1,7 +1,7 @@
 # PERCEPT Implementation Progress
 
-**Last Updated:** January 6, 2026
-**Total Tests:** 563 passing (9 skipped)
+**Last Updated:** January 7, 2026
+**Total Tests:** 656 passing (9 skipped)
 
 ---
 
@@ -16,7 +16,7 @@
 | 5 | Persistence & Review | ✅ COMPLETE | 70 |
 | 6 | Integration & Testing | ✅ COMPLETE | 63 |
 | 7 | Pipeline Visualization UI | ✅ COMPLETE | 65 |
-| 8 | Polish & Documentation | ⏳ Not Started | - |
+| 8 | Polish & Documentation | ✅ COMPLETE | 93 |
 
 ---
 
@@ -504,13 +504,103 @@ WS /ws/stream   # Binary frame streaming
 
 ---
 
-## Phase 8: Polish & Documentation ⏳ NOT STARTED
+## Phase 8: Polish & Documentation ✅ COMPLETE
 
-- Adaptive processing
-- Performance optimization
+### Goals
+- Adaptive processing based on scene complexity
+- Performance profiling utilities
+- CI/CD configuration
 - API documentation
-- User guide
-- Deployment instructions
+- User guide and deployment instructions
+
+### Implemented Modules
+
+| Module | File | Description |
+|--------|------|-------------|
+| ProcessingMode | `percept/utils/adaptive.py` | Enum: FULL, BALANCED, FAST, MINIMAL |
+| SceneComplexity | `percept/utils/adaptive.py` | Enum: LOW, MEDIUM, HIGH, EXTREME |
+| AdaptiveConfig | `percept/utils/adaptive.py` | Configuration with mode-specific features |
+| SceneAnalyzer | `percept/utils/adaptive.py` | Analyze object count, motion, depth |
+| FPSController | `percept/utils/adaptive.py` | Maintain target FPS with frame skipping |
+| AdaptiveProcessor | `percept/utils/adaptive.py` | Main controller with mode smoothing |
+| AdaptiveProcessingModule | `percept/utils/adaptive.py` | Pipeline module for integration |
+| Timer | `percept/utils/profiler.py` | Simple timer with lap support |
+| TimingRecord | `percept/utils/profiler.py` | Single timing measurement |
+| TimingStats | `percept/utils/profiler.py` | Statistics with percentiles |
+| StageProfiler | `percept/utils/profiler.py` | Profile individual pipeline stages |
+| FrameProfiler | `percept/utils/profiler.py` | Profile complete frame processing |
+| MemoryProfiler | `percept/utils/profiler.py` | Track memory usage snapshots |
+| FullProfiler | `percept/utils/profiler.py` | cProfile-based detailed profiling |
+| PipelineProfiler | `percept/utils/profiler.py` | Main profiler for entire pipeline |
+
+### Adaptive Processing Modes
+
+| Mode | Features | Target Use Case |
+|------|----------|-----------------|
+| FULL | All features enabled | Low load, quality priority |
+| BALANCED | Core features only | Normal operation |
+| FAST | Detection + tracking | High load |
+| MINIMAL | Detection only | Emergency fallback |
+
+### CI/CD Configuration
+
+| File | Description |
+|------|-------------|
+| `.github/workflows/ci.yml` | GitHub Actions workflow |
+
+**CI Jobs:**
+- `lint` - Black, isort, ruff
+- `test` - pytest on Python 3.10, 3.11, 3.12
+- `type-check` - mypy with type stubs
+- `security` - bandit security scan
+- `docs` - mkdocs build
+- `build` - Package build and check
+- `integration` - Hardware tests (self-hosted)
+
+### Documentation
+
+| File | Description |
+|------|-------------|
+| `docs/API.md` | REST API and WebSocket reference |
+| `docs/USER_GUIDE.md` | User guide with examples |
+| `docs/DEPLOYMENT.md` | Deployment on Raspberry Pi |
+
+### Test Files
+
+| File | Tests | Description |
+|------|-------|-------------|
+| `tests/utils/test_adaptive.py` | 44 | Adaptive processing, FPS control |
+| `tests/utils/test_profiler.py` | 49 | Timing, memory, stage profiling |
+
+### Key Design Decisions
+
+1. **Mode smoothing** - Avoid rapid mode switching with history-based voting
+2. **Feature toggles** - Per-mode feature enable/disable configuration
+3. **Frame skipping** - Skip stale frames to catch up when behind
+4. **Stage profiling** - Context managers and decorators for timing
+5. **Memory snapshots** - psutil-based memory tracking
+6. **Percentile stats** - p50, p95, p99 for latency analysis
+7. **CI matrix** - Test on multiple Python versions
+
+### Architecture
+
+```
+Frame Processing
+    │
+    ├─→ AdaptiveProcessor ─────────────────────┐
+    │        │                                  │
+    │        ├─→ SceneAnalyzer ─→ Complexity   │
+    │        │                                  │
+    │        └─→ FPSController ─→ Mode         │
+    │                                          │
+    ├─→ PipelineProfiler ──────────────────────┤
+    │        │                                  │
+    │        ├─→ StageProfiler ─→ Timing       │
+    │        │                                  │
+    │        └─→ MemoryProfiler ─→ Memory      │
+    │                                          │
+    └─→ Feature Toggle ─→ Enabled Features ────┘
+```
 
 ---
 
@@ -544,7 +634,8 @@ python -c "from percept.segmentation import *; print('Segmentation OK')"
 ## Git History
 
 ```
-[pending] Complete Phase 7: Add Pipeline Visualization UI
+[pending] Complete Phase 8: Add polish and documentation
+e15dc9b Complete Phase 7: Add Pipeline Visualization UI
 [done] Complete Phase 6: Add integration and testing layer
 [done] Complete Phase 5: Add persistence and review layer
 4630032 Complete Phase 4: Add classification pipelines
