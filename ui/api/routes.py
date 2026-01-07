@@ -102,11 +102,11 @@ async def get_dashboard_data(state=Depends(get_app_state)):
     if state.config and state.config.cameras:
         for cam_cfg in state.config.cameras:
             cameras.append(CameraStatus(
-                id=cam_cfg.device_id,
-                name=cam_cfg.name or cam_cfg.device_id,
-                connected=True,
-                fps=30.0,
-                resolution=(cam_cfg.width, cam_cfg.height),
+                id=cam_cfg.id,
+                name=cam_cfg.id,
+                connected=cam_cfg.enabled,
+                fps=float(cam_cfg.fps),
+                resolution=cam_cfg.resolution,
                 last_frame_time=datetime.now(),
             ))
 
@@ -444,23 +444,28 @@ async def get_config_data(config=Depends(get_config)):
     return {
         "cameras": [
             {
-                "device_id": c.device_id,
-                "name": c.name,
-                "width": c.width,
-                "height": c.height,
+                "id": c.id,
+                "type": c.type,
+                "serial": c.serial,
+                "resolution": c.resolution,
                 "fps": c.fps,
+                "enabled": c.enabled,
             }
             for c in (config.cameras or [])
         ],
         "segmentation": {
-            "fastsam_model_path": config.segmentation.fastsam_model_path,
-            "use_depth_refinement": config.segmentation.use_depth_refinement,
+            "primary_method": config.segmentation.primary_method,
+            "fusion_enabled": config.segmentation.fusion_enabled,
+            "min_object_pixels": config.segmentation.min_object_pixels,
         },
         "tracking": {
-            "match_threshold": config.tracking.match_threshold,
+            "algorithm": config.tracking.algorithm,
+            "min_track_confidence": config.tracking.min_track_confidence,
+            "lost_track_buffer_frames": config.tracking.lost_track_buffer_frames,
         },
         "database": {
-            "db_path": config.database.db_path,
+            "path": config.database.path,
+            "embedding_index_type": config.database.embedding_index_type,
         },
     }
 

@@ -44,16 +44,16 @@ class AppState:
         async with self._lock:
             # Load configuration
             if config_path and Path(config_path).exists():
-                self.config = PerceptConfig.from_yaml(config_path)
+                self.config = PerceptConfig.load(config_path)
             else:
                 self.config = PerceptConfig()
 
             # Initialize database connection
             try:
                 from percept.persistence.database import PerceptDatabase
-                db_path = Path(self.config.database.db_path)
+                db_path = self.config.database.get_absolute_path()
                 db_path.parent.mkdir(parents=True, exist_ok=True)
-                self.database = PerceptDatabase(db_path)
+                self.database = PerceptDatabase(str(db_path))
                 self.database.initialize()
             except Exception as e:
                 print(f"Warning: Could not initialize database: {e}")
