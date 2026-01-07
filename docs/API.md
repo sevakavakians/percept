@@ -5,7 +5,7 @@ This document describes the REST API and WebSocket interfaces provided by PERCEP
 ## Base URL
 
 ```
-http://localhost:8000
+http://localhost:8080
 ```
 
 ## Authentication
@@ -415,7 +415,7 @@ Real-time event stream.
 
 **Connection:**
 ```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/events');
+const ws = new WebSocket('ws://localhost:8080/ws/events');
 ```
 
 **Event Types:**

@@ -87,9 +87,18 @@ async def lifespan(app: FastAPI):
     await app_state.initialize(config_path)
     print(f"PERCEPT UI started at {app_state.start_time}")
 
+    # Start background tasks
+    from ui.api.websocket import start_metrics_broadcast
+    metrics_task = asyncio.create_task(start_metrics_broadcast())
+
     yield
 
     # Shutdown
+    metrics_task.cancel()
+    try:
+        await metrics_task
+    except asyncio.CancelledError:
+        pass
     await app_state.shutdown()
     print("PERCEPT UI shutdown complete")
 
@@ -105,10 +114,24 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware for development
+# CORS middleware - configurable via environment variable
+# Set PERCEPT_CORS_ORIGINS to comma-separated list of allowed origins
+# Default allows localhost origins for development
+cors_origins_env = os.environ.get("PERCEPT_CORS_ORIGINS", "")
+if cors_origins_env:
+    cors_origins = [origin.strip() for origin in cors_origins_env.split(",")]
+else:
+    # Default: allow common localhost origins for development
+    cors_origins = [
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -5,6 +5,7 @@ object queries, configuration management, and review queue.
 """
 
 import io
+import logging
 import os
 import psutil
 from datetime import datetime
@@ -14,6 +15,8 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
+
+logger = logging.getLogger(__name__)
 
 from ui.models import (
     Alert,
@@ -157,11 +160,11 @@ async def list_cameras(config=Depends(get_config)):
     if config and config.cameras:
         for cam_cfg in config.cameras:
             cameras.append(CameraStatus(
-                id=cam_cfg.device_id,
-                name=cam_cfg.name or cam_cfg.device_id,
-                connected=True,
-                fps=30.0,
-                resolution=(cam_cfg.width, cam_cfg.height),
+                id=cam_cfg.id,
+                name=cam_cfg.id,
+                connected=cam_cfg.enabled,
+                fps=float(cam_cfg.fps),
+                resolution=cam_cfg.resolution,
             ))
     return cameras
 
@@ -371,7 +374,7 @@ async def list_objects(
                     status=obj.classification_status.value if obj.classification_status else "unclassified",
                 ))
         except Exception as e:
-            print(f"Error listing objects: {e}")
+            logger.warning(f"Error listing objects: {e}")
 
     pages = (total + page_size - 1) // page_size if total > 0 else 1
 
@@ -488,18 +491,18 @@ async def update_config(update: ConfigUpdate, state=Depends(get_app_state)):
     # Apply configuration
     try:
         config_path = os.environ.get("PERCEPT_CONFIG", "config/percept_config.yaml")
-        # Save to file
+        # Save to file using safe_dump for security
         import yaml
         with open(config_path, 'w') as f:
-            yaml.dump(update.config, f)
+            yaml.safe_dump(update.config, f, default_flow_style=False, sort_keys=False)
 
         # Reload
         from percept.core.config import PerceptConfig
-        state.config = PerceptConfig.from_yaml(config_path)
+        state.config = PerceptConfig.load(config_path)
 
         return APIResponse(success=True, data={"reloaded": True})
     except Exception as e:
-        return APIResponse(success=False, error=str(e))
+        return APIResponse(success=False, error=f"Failed to apply configuration: {type(e).__name__}")
 
 
 @router.post("/config/validate", response_model=ValidationResult)
@@ -573,7 +576,7 @@ async def get_review_queue(
                     camera_id=obj.camera_id,
                 ))
         except Exception as e:
-            print(f"Error getting review queue: {e}")
+            logger.warning(f"Error getting review queue: {e}")
 
     return items
 

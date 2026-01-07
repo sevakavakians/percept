@@ -153,7 +153,7 @@ PERCEPT_DB_PATH=/var/lib/percept/percept.db
 
 # Web interface
 PERCEPT_HOST=0.0.0.0
-PERCEPT_PORT=8000
+PERCEPT_PORT=8080
 
 # Hardware
 HAILO_DEVICE_ID=0
@@ -289,7 +289,7 @@ server {
     server_name percept.local;
 
     location / {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -299,7 +299,7 @@ server {
     }
 
     location /ws {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -362,7 +362,7 @@ gpu_mem=128
 
 ### Built-in Metrics
 
-Access metrics at `http://localhost:8000/api/metrics`:
+Access metrics at `http://localhost:8080/api/metrics`:
 
 ```json
 {
@@ -391,11 +391,11 @@ Metrics available at `http://localhost:9090/metrics`.
 
 ```bash
 # Simple health check
-curl -s http://localhost:8000/health | jq .
+curl -s http://localhost:8080/health | jq .
 
 # Detailed check script
 #!/bin/bash
-HEALTH=$(curl -s http://localhost:8000/health)
+HEALTH=$(curl -s http://localhost:8080/health)
 STATUS=$(echo $HEALTH | jq -r '.status')
 
 if [ "$STATUS" != "healthy" ]; then

@@ -59,7 +59,7 @@ A comprehensive guide to using PERCEPT for vision processing on mobile robots.
    ```
 
 2. **Open the dashboard:**
-   Open http://localhost:8000 in your browser.
+   Open http://localhost:8080 in your browser.
 
 3. **View live processing:**
    The dashboard shows real-time object detection and tracking.

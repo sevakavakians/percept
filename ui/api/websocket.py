@@ -236,6 +236,8 @@ async def websocket_stream(websocket: WebSocket):
     Clients receive binary JPEG frames for live video display.
     """
     await manager.connect(websocket, "stream")
+    consecutive_timeouts = 0
+    max_consecutive_timeouts = 10  # Disconnect after 5 minutes of no response
 
     try:
         # Send initial connection message
@@ -254,13 +256,24 @@ async def websocket_stream(websocket: WebSocket):
                     timeout=30.0
                 )
 
+                # Reset timeout counter on any message
+                consecutive_timeouts = 0
+
                 # Handle ping
                 if data == "ping":
                     await websocket.send_text("pong")
 
             except asyncio.TimeoutError:
-                # Send keepalive
-                await websocket.send_text("keepalive")
+                consecutive_timeouts += 1
+                if consecutive_timeouts >= max_consecutive_timeouts:
+                    # Connection appears dead, disconnect
+                    break
+                # Try to send keepalive
+                try:
+                    await websocket.send_text("keepalive")
+                except Exception:
+                    # Connection is dead
+                    break
 
     except WebSocketDisconnect:
         pass
@@ -276,6 +289,8 @@ async def websocket_events(websocket: WebSocket):
     alerts, and metrics.
     """
     await manager.connect(websocket, "events")
+    consecutive_timeouts = 0
+    max_consecutive_timeouts = 10  # Disconnect after 5 minutes of no response
 
     try:
         # Send initial connection message
@@ -294,6 +309,9 @@ async def websocket_events(websocket: WebSocket):
                     timeout=30.0
                 )
 
+                # Reset timeout counter on any message
+                consecutive_timeouts = 0
+
                 # Handle commands from client
                 try:
                     message = json.loads(data)
@@ -303,12 +321,20 @@ async def websocket_events(websocket: WebSocket):
                         await websocket.send_text("pong")
 
             except asyncio.TimeoutError:
-                # Send keepalive heartbeat
-                await websocket.send_json({
-                    "type": "heartbeat",
-                    "timestamp": datetime.now().isoformat(),
-                    "connections": manager.connection_count,
-                })
+                consecutive_timeouts += 1
+                if consecutive_timeouts >= max_consecutive_timeouts:
+                    # Connection appears dead, disconnect
+                    break
+                # Try to send keepalive heartbeat
+                try:
+                    await websocket.send_json({
+                        "type": "heartbeat",
+                        "timestamp": datetime.now().isoformat(),
+                        "connections": manager.connection_count,
+                    })
+                except Exception:
+                    # Connection is dead
+                    break
 
     except WebSocketDisconnect:
         pass
