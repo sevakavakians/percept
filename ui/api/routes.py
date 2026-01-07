@@ -206,6 +206,45 @@ async def get_camera_frame(camera_id: str, state=Depends(get_app_state)):
     return Response(content=jpeg.tobytes(), media_type="image/jpeg")
 
 
+@router.get("/cameras/{camera_id}/stream")
+async def stream_camera(camera_id: str, state=Depends(get_app_state)):
+    """Stream MJPEG video from camera."""
+    import cv2
+    import asyncio
+
+    async def generate_frames():
+        """Generate MJPEG frames."""
+        while True:
+            if camera_id in state.cameras:
+                try:
+                    camera = state.cameras[camera_id]
+                    frame_data = camera.capture(timeout_ms=1000)
+                    if frame_data.color is not None:
+                        state.frame_count += 1
+                        _, jpeg = cv2.imencode('.jpg', frame_data.color, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                        frame_bytes = jpeg.tobytes()
+                        yield (
+                            b'--frame\r\n'
+                            b'Content-Type: image/jpeg\r\n'
+                            b'Content-Length: ' + str(len(frame_bytes)).encode() + b'\r\n'
+                            b'\r\n' + frame_bytes + b'\r\n'
+                        )
+                except Exception as e:
+                    logger.warning(f"Error streaming frame: {e}")
+                    await asyncio.sleep(0.1)
+            else:
+                # No camera, send placeholder at low rate
+                await asyncio.sleep(1.0)
+
+            # Control frame rate (~15 FPS)
+            await asyncio.sleep(0.066)
+
+    return StreamingResponse(
+        generate_frames(),
+        media_type='multipart/x-mixed-replace; boundary=frame'
+    )
+
+
 @router.get("/cameras/{camera_id}/depth")
 async def get_camera_depth(camera_id: str, state=Depends(get_app_state)):
     """Get depth visualization from camera."""

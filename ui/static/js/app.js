@@ -166,7 +166,7 @@ const dashboard = {
 
         container.innerHTML = cameras.map(cam => `
             <div class="camera-feed">
-                <img src="/api/cameras/${cam.id}/frame" alt="${cam.name}">
+                <img src="/api/cameras/${cam.id}/stream" alt="${cam.name}">
                 <div class="camera-overlay">
                     <span class="camera-name">
                         <span class="status-dot ${cam.connected ? 'active' : 'error'}"></span>
