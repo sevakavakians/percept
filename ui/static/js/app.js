@@ -202,10 +202,153 @@ const dashboard = {
 };
 
 // =============================================================================
+// SVG Helper Functions for Pipeline Graph
+// =============================================================================
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// Node type colors
+const NODE_COLORS = {
+    input: { fill: '#e3f2fd', stroke: '#1976d2' },
+    process: { fill: '#f5f5f5', stroke: '#616161' },
+    conditional: { fill: '#fff8e1', stroke: '#f9a825' },
+    output: { fill: '#e8f5e9', stroke: '#388e3c' },
+};
+
+function createSvgElement(tag, attrs = {}) {
+    const el = document.createElementNS(SVG_NS, tag);
+    for (const [key, value] of Object.entries(attrs)) {
+        el.setAttribute(key, value);
+    }
+    return el;
+}
+
+function createNodeGroup(node) {
+    const group = createSvgElement('g', {
+        class: `pipeline-node ${node.type}`,
+        'data-node': node.id,
+        transform: `translate(${node.x}, ${node.y})`,
+    });
+
+    const colors = NODE_COLORS[node.type] || NODE_COLORS.process;
+
+    // Rectangle background
+    const rect = createSvgElement('rect', {
+        width: node.width,
+        height: node.height,
+        rx: 8,
+        fill: colors.fill,
+        stroke: colors.stroke,
+        'stroke-width': 2,
+    });
+    group.appendChild(rect);
+
+    // Node label
+    const label = createSvgElement('text', {
+        x: node.width / 2,
+        y: node.height / 2 - 6,
+        'text-anchor': 'middle',
+        'dominant-baseline': 'middle',
+        class: 'node-label',
+        'font-size': '12',
+        'font-weight': 'bold',
+    });
+    label.textContent = node.label;
+    group.appendChild(label);
+
+    // Module name (smaller)
+    const module = createSvgElement('text', {
+        x: node.width / 2,
+        y: node.height / 2 + 12,
+        'text-anchor': 'middle',
+        'dominant-baseline': 'middle',
+        class: 'node-module',
+        'font-size': '10',
+        fill: '#666',
+    });
+    module.textContent = node.module || '';
+    group.appendChild(module);
+
+    // Make clickable
+    group.style.cursor = 'pointer';
+
+    return group;
+}
+
+function createEdgePath(sourceNode, targetNode, edge) {
+    // Calculate connection points
+    const sourceX = sourceNode.x + sourceNode.width / 2;
+    const sourceY = sourceNode.y + sourceNode.height;
+    const targetX = targetNode.x + targetNode.width / 2;
+    const targetY = targetNode.y;
+
+    // Create curved path using cubic bezier
+    const midY = (sourceY + targetY) / 2;
+    const d = `M ${sourceX} ${sourceY} C ${sourceX} ${midY}, ${targetX} ${midY}, ${targetX} ${targetY}`;
+
+    const path = createSvgElement('path', {
+        d: d,
+        class: 'pipeline-edge',
+        fill: 'none',
+        stroke: '#999',
+        'stroke-width': 2,
+        'marker-end': 'url(#arrowhead)',
+    });
+
+    return path;
+}
+
+function createEdgeLabel(sourceNode, targetNode, edge) {
+    if (!edge.label && !edge.data_type) return null;
+
+    const sourceX = sourceNode.x + sourceNode.width / 2;
+    const sourceY = sourceNode.y + sourceNode.height;
+    const targetX = targetNode.x + targetNode.width / 2;
+    const targetY = targetNode.y;
+
+    const midX = (sourceX + targetX) / 2;
+    const midY = (sourceY + targetY) / 2;
+
+    const text = createSvgElement('text', {
+        x: midX,
+        y: midY,
+        'text-anchor': 'middle',
+        'dominant-baseline': 'middle',
+        class: 'edge-label',
+        'font-size': '10',
+        fill: '#666',
+    });
+    text.textContent = edge.label || edge.data_type || '';
+
+    return text;
+}
+
+function createArrowMarker() {
+    const defs = createSvgElement('defs');
+    const marker = createSvgElement('marker', {
+        id: 'arrowhead',
+        markerWidth: 10,
+        markerHeight: 7,
+        refX: 9,
+        refY: 3.5,
+        orient: 'auto',
+    });
+    const polygon = createSvgElement('polygon', {
+        points: '0 0, 10 3.5, 0 7',
+        fill: '#999',
+    });
+    marker.appendChild(polygon);
+    defs.appendChild(marker);
+    return defs;
+}
+
+// =============================================================================
 // Pipeline Module
 // =============================================================================
 
 const pipeline = {
+    selectedNode: null,
+
     async load() {
         try {
             state.pipelineGraph = await api.get('/pipeline/graph');
@@ -216,44 +359,104 @@ const pipeline = {
     },
 
     render() {
-        const graph = state.pipelineGraph;
-        if (!graph) return;
+        const data = state.pipelineGraph;
+        if (!data) return;
 
         const container = document.getElementById('pipeline-graph');
         if (!container) return;
 
-        // Simple horizontal layout
-        const html = graph.nodes.map((node, i) => {
-            const statusClass = node.status === 'running' ? 'active' :
-                               node.status === 'error' ? 'error' : '';
+        // Create SVG with viewBox from layout dimensions
+        const padding = 20;
+        const svg = createSvgElement('svg', {
+            viewBox: `0 0 ${data.width + padding * 2} ${data.height + padding * 2}`,
+            class: 'pipeline-svg',
+            preserveAspectRatio: 'xMidYMid meet',
+        });
 
-            return `
-                <div class="pipeline-node ${statusClass}" data-node="${node.id}">
-                    <div class="node-label">${node.label}</div>
-                    <div class="node-timing">${node.timing_ms.toFixed(1)}ms</div>
-                </div>
-                ${i < graph.nodes.length - 1 ? '<div class="pipeline-edge"></div>' : ''}
-            `;
-        }).join('');
+        // Add arrow marker definition
+        svg.appendChild(createArrowMarker());
 
-        container.innerHTML = html;
+        // Create main group with padding offset
+        const mainGroup = createSvgElement('g', {
+            transform: `translate(${padding}, ${padding})`,
+        });
 
-        // Add click handlers
+        // Draw edges first (so nodes appear on top)
+        for (const edge of data.edges) {
+            const source = data.nodes.find(n => n.id === edge.source);
+            const target = data.nodes.find(n => n.id === edge.target);
+            if (source && target) {
+                const path = createEdgePath(source, target, edge);
+                mainGroup.appendChild(path);
+
+                const label = createEdgeLabel(source, target, edge);
+                if (label) mainGroup.appendChild(label);
+            }
+        }
+
+        // Draw nodes
+        for (const node of data.nodes) {
+            const group = createNodeGroup(node);
+            mainGroup.appendChild(group);
+        }
+
+        svg.appendChild(mainGroup);
+
+        // Clear and append
+        container.innerHTML = '';
+        container.appendChild(svg);
+
+        // Add click handlers to nodes
         container.querySelectorAll('.pipeline-node').forEach(el => {
             el.addEventListener('click', () => {
                 const nodeId = el.dataset.node;
-                this.showNodeDetails(nodeId);
+                this.selectNode(nodeId);
             });
         });
     },
 
+    selectNode(nodeId) {
+        // Remove previous selection
+        document.querySelectorAll('.pipeline-node.selected').forEach(el => {
+            el.classList.remove('selected');
+        });
+
+        // Add selection to new node
+        const nodeEl = document.querySelector(`.pipeline-node[data-node="${nodeId}"]`);
+        if (nodeEl) {
+            nodeEl.classList.add('selected');
+        }
+
+        this.selectedNode = nodeId;
+        this.showNodeDetails(nodeId);
+    },
+
     async showNodeDetails(nodeId) {
-        try {
-            const output = await api.get(`/pipeline/stages/${nodeId}/output`);
-            console.log('Stage output:', output);
-            // Could show in modal
-        } catch (error) {
-            console.error('Failed to load stage output:', error);
+        const outputContainer = document.getElementById('stage-output');
+        if (!outputContainer) return;
+
+        // Find node info from graph
+        const node = state.pipelineGraph?.nodes.find(n => n.id === nodeId);
+
+        if (node) {
+            outputContainer.innerHTML = `
+                <div class="stage-detail">
+                    <div class="stage-header">
+                        <h3>${node.label}</h3>
+                        <span class="stage-type badge badge-${node.type}">${node.type}</span>
+                    </div>
+                    <p class="text-muted">${node.description || ''}</p>
+                    <div class="stage-stream">
+                        <img src="/api/pipeline/stages/${nodeId}/stream"
+                             alt="${node.label} output"
+                             class="stage-video"
+                             onerror="this.style.display='none'" />
+                    </div>
+                    <div class="stage-info">
+                        <span class="text-muted">Module: ${node.module || 'N/A'}</span>
+                    </div>
+                </div>
+            `;
         }
     },
 };

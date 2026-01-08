@@ -317,6 +317,7 @@ class LayoutEngine:
         """Export layout as JSON for frontend."""
         layout = self.calculate_layout()
         return {
+            "name": self.graph.name,
             "nodes": [
                 {
                     "id": node.id,

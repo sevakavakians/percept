@@ -19,6 +19,14 @@ from fastapi.templating import Jinja2Templates
 
 from percept.core.config import PerceptConfig
 
+# Import stage visualization components
+from ui.components.stage_frames import stage_buffer
+from ui.components.stage_visualizers import visualize_capture, visualize_segmentation
+
+# Import segmentation
+from percept.segmentation import FastSAMSegmenter, FastSAMConfig, is_hailo_available
+from percept.core.adapter import PipelineData
+
 # Import routers
 from ui.api.routes import router as api_router
 from ui.api.websocket import router as ws_router
@@ -34,6 +42,7 @@ class AppState:
         self.config: Optional[PerceptConfig] = None
         self.database = None
         self.pipeline = None
+        self.segmenter: Optional[FastSAMSegmenter] = None
         self.cameras: Dict[str, Any] = {}  # camera_id -> RealSenseCamera
         self.start_time: datetime = datetime.now()
         self.frame_count: int = 0
@@ -77,6 +86,18 @@ class AppState:
             except Exception as e:
                 print(f"Warning: Could not initialize cameras: {e}")
 
+            # Initialize segmentation pipeline
+            try:
+                if is_hailo_available():
+                    self.segmenter = FastSAMSegmenter(FastSAMConfig())
+                    self.segmenter.initialize()
+                    print("FastSAM segmenter initialized with Hailo-8")
+                else:
+                    print("Hailo not available - segmentation disabled")
+            except Exception as e:
+                print(f"Warning: Could not initialize segmenter: {e}")
+                self.segmenter = None
+
     async def shutdown(self):
         """Cleanup on shutdown."""
         async with self._lock:
@@ -89,6 +110,15 @@ class AppState:
                     print(f"Warning: Error stopping camera '{camera_id}': {e}")
             self.cameras.clear()
 
+            # Cleanup segmenter
+            if self.segmenter:
+                try:
+                    self.segmenter.cleanup()
+                    print("Segmenter cleaned up")
+                except Exception as e:
+                    print(f"Warning: Error cleaning up segmenter: {e}")
+                self.segmenter = None
+
             if self.database:
                 self.database.close()
 
@@ -100,6 +130,83 @@ class AppState:
 
 # Global state instance
 app_state = AppState()
+
+
+# =============================================================================
+# Pipeline Processing Loop
+# =============================================================================
+
+async def run_pipeline_loop(interval_ms: float = 66):
+    """Background task: capture frames and update stage visualizations.
+
+    This runs continuously, capturing frames from cameras and updating
+    the stage buffer with visualized outputs for streaming.
+
+    Args:
+        interval_ms: Target interval between frames (~15 FPS default)
+    """
+    frame_id = 0
+
+    while True:
+        try:
+            for camera_id, camera in app_state.cameras.items():
+                try:
+                    # Capture frame
+                    frame_data = camera.capture(timeout_ms=100)
+
+                    if frame_data is None or frame_data.color is None:
+                        continue
+
+                    frame_id += 1
+                    app_state.frame_count = frame_id
+
+                    # Update capture stage visualization
+                    capture_vis = visualize_capture(
+                        frame=frame_data.color,
+                        camera_id=camera_id,
+                        frame_id=frame_id,
+                        fps=frame_id / max(1, app_state.uptime_seconds),
+                    )
+                    stage_buffer.update("capture", capture_vis)
+
+                    # Run segmentation if available
+                    if app_state.segmenter is not None:
+                        try:
+                            # Create pipeline data from frame
+                            pipeline_data = PipelineData(
+                                image=frame_data.color,
+                                depth=frame_data.depth,
+                            )
+
+                            # Run segmentation
+                            seg_result = app_state.segmenter.process(pipeline_data)
+                            masks = seg_result.get("masks", [])
+
+                            # Visualize segmentation
+                            seg_vis = visualize_segmentation(
+                                frame=frame_data.color,
+                                masks=masks,
+                                alpha=0.4,
+                            )
+                            stage_buffer.update("segment", seg_vis)
+
+                        except Exception as e:
+                            # Log segmentation errors but continue
+                            pass
+
+                    # TODO: Run tracking and update "tracking" stage
+                    # TODO: Run ReID and update "reid" stage
+                    # TODO: Run classification pipelines
+
+                except Exception as e:
+                    # Log but don't crash on individual frame errors
+                    pass
+
+        except Exception as e:
+            print(f"Pipeline loop error: {e}")
+
+        # Control frame rate
+        await asyncio.sleep(interval_ms / 1000.0)
 
 
 # =============================================================================
@@ -117,13 +224,19 @@ async def lifespan(app: FastAPI):
     # Start background tasks
     from ui.api.websocket import start_metrics_broadcast
     metrics_task = asyncio.create_task(start_metrics_broadcast())
+    pipeline_task = asyncio.create_task(run_pipeline_loop())
 
     yield
 
     # Shutdown
     metrics_task.cancel()
+    pipeline_task.cancel()
     try:
         await metrics_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await pipeline_task
     except asyncio.CancelledError:
         pass
     await app_state.shutdown()

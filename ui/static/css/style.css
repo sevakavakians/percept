@@ -290,6 +290,115 @@ body {
     border-left-color: var(--border);
 }
 
+/* SVG Pipeline Graph */
+.pipeline-svg {
+    width: 100%;
+    height: auto;
+    min-height: 400px;
+    display: block;
+}
+
+.pipeline-svg .pipeline-node {
+    cursor: pointer;
+    transition: filter 0.2s;
+}
+
+.pipeline-svg .pipeline-node:hover rect {
+    filter: brightness(0.95);
+}
+
+.pipeline-svg .pipeline-node.selected rect {
+    stroke: var(--accent);
+    stroke-width: 3;
+}
+
+.pipeline-svg .node-label {
+    font-family: inherit;
+    fill: #333;
+    pointer-events: none;
+}
+
+.pipeline-svg .node-module {
+    font-family: inherit;
+    pointer-events: none;
+}
+
+.pipeline-svg .pipeline-edge {
+    fill: none;
+    stroke: #999;
+    stroke-width: 2;
+}
+
+.pipeline-svg .edge-label {
+    font-family: inherit;
+    pointer-events: none;
+}
+
+/* Stage Detail Panel */
+.stage-detail {
+    padding: 0.5rem 0;
+}
+
+.stage-detail h3 {
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.stage-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.stage-type {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.badge-input { background: #1976d2; color: white; }
+.badge-process { background: #616161; color: white; }
+.badge-conditional { background: #f9a825; color: black; }
+.badge-output { background: #388e3c; color: white; }
+
+.stage-stream {
+    margin-top: 1rem;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stage-video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.stage-info {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.stage-detail .table {
+    margin-top: 1rem;
+}
+
+.stage-detail .table td {
+    padding: 0.5rem;
+}
+
+.stage-detail .table td:first-child {
+    width: 100px;
+    color: var(--text-secondary);
+}
+
 /* Object Gallery */
 .object-grid {
     display: grid;

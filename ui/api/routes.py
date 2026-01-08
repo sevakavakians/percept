@@ -18,6 +18,10 @@ from fastapi.responses import StreamingResponse
 
 logger = logging.getLogger(__name__)
 
+from ui.components.frame_viewer import FrameEncoder
+from ui.components.pipeline_graph import LayoutEngine, get_default_pipeline_graph
+from ui.components.stage_frames import stage_buffer
+from ui.components.stage_visualizers import visualize_placeholder
 from ui.models import (
     Alert,
     AlertLevel,
@@ -283,107 +287,12 @@ async def get_camera_depth(camera_id: str, state=Depends(get_app_state)):
 # Pipeline Endpoints
 # =============================================================================
 
-@router.get("/pipeline/graph", response_model=PipelineGraph)
+@router.get("/pipeline/graph")
 async def get_pipeline_graph():
-    """Get pipeline DAG structure for visualization."""
-    return PipelineGraph(
-        name="main",
-        nodes=[
-            PipelineNode(
-                id="capture",
-                type=NodeType.INPUT,
-                label="Camera Capture",
-                description="RGB-D frame acquisition",
-                module_name="RealSenseCamera",
-                status="running",
-            ),
-            PipelineNode(
-                id="segment",
-                type=NodeType.PROCESS,
-                label="Segmentation",
-                description="FastSAM + depth fusion",
-                module_name="SegmentationFusion",
-                status="running",
-                timing_ms=30.0,
-            ),
-            PipelineNode(
-                id="tracking",
-                type=NodeType.PROCESS,
-                label="Tracking",
-                description="ByteTrack object tracking",
-                module_name="ByteTrackWrapper",
-                status="running",
-                timing_ms=3.0,
-            ),
-            PipelineNode(
-                id="reid",
-                type=NodeType.PROCESS,
-                label="ReID",
-                description="Re-identification matching",
-                module_name="ReIDMatcher",
-                status="running",
-                timing_ms=5.0,
-            ),
-            PipelineNode(
-                id="router",
-                type=NodeType.CONDITIONAL,
-                label="Router",
-                description="Classification routing",
-                module_name="PipelineRouter",
-                status="running",
-                timing_ms=0.1,
-            ),
-            PipelineNode(
-                id="person",
-                type=NodeType.PROCESS,
-                label="Person Pipeline",
-                description="Pose, clothing, face",
-                module_name="PersonPipeline",
-                status="idle",
-                timing_ms=25.0,
-            ),
-            PipelineNode(
-                id="vehicle",
-                type=NodeType.PROCESS,
-                label="Vehicle Pipeline",
-                description="Color, type, plate",
-                module_name="VehiclePipeline",
-                status="idle",
-                timing_ms=15.0,
-            ),
-            PipelineNode(
-                id="generic",
-                type=NodeType.PROCESS,
-                label="Generic Pipeline",
-                description="ImageNet, color, shape",
-                module_name="GenericPipeline",
-                status="idle",
-                timing_ms=20.0,
-            ),
-            PipelineNode(
-                id="persist",
-                type=NodeType.OUTPUT,
-                label="Database",
-                description="SQLite + embedding store",
-                module_name="PerceptDatabase",
-                status="running",
-                timing_ms=5.0,
-            ),
-        ],
-        edges=[
-            PipelineEdge(source="capture", target="segment", data_type="FrameData"),
-            PipelineEdge(source="segment", target="tracking", data_type="ObjectMask[]"),
-            PipelineEdge(source="tracking", target="reid", data_type="Track[]"),
-            PipelineEdge(source="reid", target="router", data_type="ObjectSchema[]"),
-            PipelineEdge(source="router", target="person", label="person"),
-            PipelineEdge(source="router", target="vehicle", label="vehicle"),
-            PipelineEdge(source="router", target="generic", label="other"),
-            PipelineEdge(source="person", target="persist"),
-            PipelineEdge(source="vehicle", target="persist"),
-            PipelineEdge(source="generic", target="persist"),
-        ],
-        active=True,
-    )
+    """Get pipeline DAG structure with layout for visualization."""
+    graph = get_default_pipeline_graph()
+    engine = LayoutEngine(graph)
+    return engine.to_json()
 
 
 @router.get("/pipeline/stages", response_model=List[str])
@@ -407,6 +316,55 @@ async def get_stage_output(stage_id: str, frame_id: int = 0):
         image_url=f"/api/pipeline/stages/{stage_id}/image?frame_id={frame_id}",
         metadata={"stage": stage_id, "frame": frame_id},
         output_count=5,
+    )
+
+
+@router.get("/pipeline/stages/{stage_id}/stream")
+async def stream_stage(stage_id: str, state=Depends(get_app_state)):
+    """Stream MJPEG video from a pipeline stage.
+
+    Each stage shows its visualized output:
+    - capture: Raw camera feed with info overlay
+    - segment: Frame with colored mask overlays
+    - tracking: Frame with bounding boxes and track IDs
+    - reid: Frame highlighting matched vs new objects
+    - etc.
+    """
+    import asyncio
+
+    encoder = FrameEncoder(quality=80)
+
+    async def generate_frames():
+        """Generate MJPEG frames from stage buffer."""
+        while True:
+            frame = stage_buffer.get(stage_id)
+
+            if frame is None:
+                # Generate placeholder if no data
+                frame = visualize_placeholder(
+                    width=640,
+                    height=480,
+                    message="Waiting for data...",
+                    stage_id=stage_id,
+                )
+
+            # Encode as JPEG
+            jpeg_bytes = encoder.encode_jpeg(frame)
+
+            if jpeg_bytes:
+                yield (
+                    b'--frame\r\n'
+                    b'Content-Type: image/jpeg\r\n'
+                    b'Content-Length: ' + str(len(jpeg_bytes)).encode() + b'\r\n'
+                    b'\r\n' + jpeg_bytes + b'\r\n'
+                )
+
+            # ~15 FPS
+            await asyncio.sleep(0.066)
+
+    return StreamingResponse(
+        generate_frames(),
+        media_type='multipart/x-mixed-replace; boundary=frame'
     )
 
 
