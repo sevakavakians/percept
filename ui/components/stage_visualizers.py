@@ -366,7 +366,189 @@ def visualize_depth(
     # Apply colormap
     colorized = cv2.applyColorMap(depth_norm, cv2.COLORMAP_JET)
 
+    # Add depth scale legend
+    h, w = colorized.shape[:2]
+    cv2.putText(colorized, f"Depth: {min_depth:.1f}m - {max_depth:.1f}m", (10, 25),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
     return colorized
+
+
+def visualize_depth_edges(
+    depth: np.ndarray,
+    edges: np.ndarray,
+    min_depth: float = 0.3,
+    max_depth: float = 10.0,
+    alpha: float = 0.7,
+) -> np.ndarray:
+    """Visualize depth edges overlaid on colorized depth.
+
+    Args:
+        depth: Depth image in meters
+        edges: Binary edge mask (255 = edge, 0 = no edge)
+        min_depth: Minimum depth for normalization
+        max_depth: Maximum depth for normalization
+        alpha: Blending factor for edges
+
+    Returns:
+        Colorized depth with edge overlay
+    """
+    if not CV2_AVAILABLE:
+        return np.zeros((*depth.shape, 3), dtype=np.uint8)
+
+    # Get base colorized depth
+    base = visualize_depth(depth, min_depth, max_depth)
+
+    # Create edge overlay (cyan color for edges)
+    edge_overlay = base.copy()
+    if edges is not None and edges.shape[:2] == depth.shape[:2]:
+        edge_mask = edges > 0
+        edge_overlay[edge_mask] = (255, 255, 0)  # Cyan in BGR
+
+        # Blend
+        result = cv2.addWeighted(base, 1 - alpha, edge_overlay, alpha, 0)
+
+        # Count edge pixels
+        edge_count = np.count_nonzero(edge_mask)
+        cv2.putText(result, f"Edges: {edge_count}", (10, 50),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+    else:
+        result = base
+        cv2.putText(result, "No edges detected", (10, 50),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+    return result
+
+
+def visualize_depth_objects(
+    depth: np.ndarray,
+    labels: np.ndarray,
+    num_labels: int,
+    min_depth: float = 0.3,
+    max_depth: float = 10.0,
+) -> np.ndarray:
+    """Visualize connected components from depth segmentation.
+
+    Each connected component is colored with a unique color.
+
+    Args:
+        depth: Depth image in meters
+        labels: Label image where each pixel has component ID
+        num_labels: Number of labels (excluding background)
+        min_depth: Minimum depth for normalization
+        max_depth: Maximum depth for normalization
+
+    Returns:
+        Visualization with colored components
+    """
+    if not CV2_AVAILABLE:
+        return np.zeros((*depth.shape, 3), dtype=np.uint8)
+
+    # Start with black background
+    result = np.zeros((*depth.shape, 3), dtype=np.uint8)
+
+    if labels is not None and labels.shape == depth.shape:
+        # Color each component
+        for label_id in range(1, num_labels + 1):  # Skip background (0)
+            mask = labels == label_id
+            if not np.any(mask):
+                continue
+
+            # Get color for this component
+            color = MASK_COLORS[(label_id - 1) % len(MASK_COLORS)]
+            result[mask] = color
+
+            # Calculate centroid and add label
+            ys, xs = np.where(mask)
+            if len(xs) > 0:
+                cx, cy = int(np.mean(xs)), int(np.mean(ys))
+                # Get median depth for this component
+                median_depth = np.median(depth[mask])
+                cv2.putText(result, f"{median_depth:.1f}m", (cx - 15, cy),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+
+    # Add stats
+    cv2.putText(result, f"Objects: {num_labels}", (10, 25),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+    return result
+
+
+def visualize_depth_clusters(
+    frame: np.ndarray,
+    depth: np.ndarray,
+    clusters: List[Dict[str, Any]],
+    min_depth: float = 0.3,
+    max_depth: float = 10.0,
+) -> np.ndarray:
+    """Visualize 3D clusters projected onto the color frame.
+
+    Shows cluster centroids, bounding boxes, and 3D positions.
+
+    Args:
+        frame: BGR color frame for overlay
+        depth: Depth image in meters
+        clusters: List of cluster dicts with 'centroid_3d', 'bbox', 'point_count'
+        min_depth: Minimum depth for normalization
+        max_depth: Maximum depth for normalization
+
+    Returns:
+        Frame with cluster visualization
+    """
+    if not CV2_AVAILABLE:
+        return frame if frame is not None else np.zeros((480, 640, 3), dtype=np.uint8)
+
+    result = frame.copy() if frame is not None else np.zeros((480, 640, 3), dtype=np.uint8)
+
+    if not clusters:
+        # If no clusters, show depth heatmap overlay
+        if depth is not None:
+            depth_vis = visualize_depth(depth, min_depth, max_depth)
+            if depth_vis.shape[:2] == result.shape[:2]:
+                result = cv2.addWeighted(result, 0.6, depth_vis, 0.4, 0)
+
+        cv2.putText(result, "3D Clusters: 0", (10, 25),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(result, "Awaiting point cloud data...", (10, 50),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+        return result
+
+    for i, cluster in enumerate(clusters):
+        color = MASK_COLORS[i % len(MASK_COLORS)]
+
+        # Draw bounding box if available
+        if 'bbox' in cluster:
+            bbox = cluster['bbox']
+            x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+            cv2.rectangle(result, (x1, y1), (x2, y2), color, 2)
+
+        # Draw centroid marker if available
+        if 'centroid_2d' in cluster:
+            cx, cy = int(cluster['centroid_2d'][0]), int(cluster['centroid_2d'][1])
+            cv2.circle(result, (cx, cy), 8, color, -1)
+            cv2.circle(result, (cx, cy), 10, (255, 255, 255), 2)
+
+            # Show 3D position if available
+            if 'centroid_3d' in cluster:
+                x3d, y3d, z3d = cluster['centroid_3d']
+                label = f"({x3d:.2f}, {y3d:.2f}, {z3d:.2f})m"
+                cv2.putText(result, label, (cx + 12, cy + 5),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+
+        # Show point count
+        if 'point_count' in cluster:
+            pts = cluster['point_count']
+            if 'bbox' in cluster:
+                x1 = int(cluster['bbox'][0])
+                y1 = int(cluster['bbox'][1])
+                cv2.putText(result, f"{pts} pts", (x1, y1 - 5),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+
+    # Add stats
+    cv2.putText(result, f"3D Clusters: {len(clusters)}", (10, 25),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+    return result
 
 
 def visualize_placeholder(

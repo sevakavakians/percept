@@ -21,7 +21,14 @@ from percept.core.config import PerceptConfig
 
 # Import stage visualization components
 from ui.components.stage_frames import stage_buffer
-from ui.components.stage_visualizers import visualize_capture, visualize_segmentation
+from ui.components.stage_visualizers import (
+    visualize_capture,
+    visualize_segmentation,
+    visualize_depth,
+    visualize_depth_edges,
+    visualize_depth_objects,
+    visualize_depth_clusters,
+)
 
 # Import segmentation
 from percept.segmentation import FastSAMSegmenter, FastSAMConfig, is_hailo_available
@@ -192,6 +199,44 @@ async def run_pipeline_loop(interval_ms: float = 66):
 
                         except Exception as e:
                             # Log segmentation errors but continue
+                            pass
+
+                    # Run depth pipeline (CPU-based, no Hailo needed)
+                    if frame_data.depth is not None:
+                        try:
+                            from percept.segmentation.depth_seg import (
+                                DepthEdgeDetector,
+                                DepthConnectedComponents,
+                                DepthSegmentationConfig,
+                            )
+
+                            # Stage 1: Colorized depth visualization
+                            depth_vis = visualize_depth(frame_data.depth)
+                            stage_buffer.update("depth", depth_vis)
+
+                            # Stage 2: Depth edge detection
+                            config = DepthSegmentationConfig()
+                            detector = DepthEdgeDetector(config)
+                            edges = detector.detect_edges(frame_data.depth)
+                            edges_vis = visualize_depth_edges(frame_data.depth, edges)
+                            stage_buffer.update("depth_edges", edges_vis)
+
+                            # Stage 3: Connected components segmentation
+                            cc = DepthConnectedComponents(config)
+                            labels, num_labels = cc.segment(frame_data.depth, edges)
+                            objects_vis = visualize_depth_objects(
+                                frame_data.depth, labels, num_labels
+                            )
+                            stage_buffer.update("depth_objects", objects_vis)
+
+                            # Stage 4: 3D clusters visualization (placeholder for now)
+                            clusters_vis = visualize_depth_clusters(
+                                frame_data.color, frame_data.depth, []
+                            )
+                            stage_buffer.update("depth_clusters", clusters_vis)
+
+                        except Exception as e:
+                            # Log depth processing errors but continue
                             pass
 
                     # TODO: Run tracking and update "tracking" stage

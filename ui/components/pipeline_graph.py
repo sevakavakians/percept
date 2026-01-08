@@ -91,6 +91,16 @@ def get_default_pipeline_graph() -> PipelineGraph:
                   "ImageNet, color, shape analysis", "GenericPipeline")
         .add_node("persist", NodeType.OUTPUT, "Database",
                   "SQLite storage + embedding sync", "PerceptDatabase")
+        # DEPTH PIPELINE BRANCH
+        .add_node("depth", NodeType.PROCESS, "Depth View",
+                  "Colorized depth map visualization", "DepthVisualizer")
+        .add_node("depth_edges", NodeType.PROCESS, "Depth Edges",
+                  "Depth discontinuity detection", "DepthEdgeDetector")
+        .add_node("depth_objects", NodeType.PROCESS, "Depth Objects",
+                  "Connected component segmentation", "DepthConnectedComponents")
+        .add_node("depth_clusters", NodeType.OUTPUT, "3D Clusters",
+                  "Point cloud clustering", "PointCloudSegmenter")
+        # MAIN PIPELINE EDGES
         .add_edge("capture", "segment", data_type="FrameData")
         .add_edge("segment", "tracking", data_type="ObjectMask[]")
         .add_edge("tracking", "reid", data_type="Track[]")
@@ -101,6 +111,11 @@ def get_default_pipeline_graph() -> PipelineGraph:
         .add_edge("person", "persist")
         .add_edge("vehicle", "persist")
         .add_edge("generic", "persist")
+        # DEPTH PIPELINE EDGES
+        .add_edge("capture", "depth", data_type="FrameData")
+        .add_edge("depth", "depth_edges", data_type="depth_colorized")
+        .add_edge("depth_edges", "depth_objects", data_type="edge_mask")
+        .add_edge("depth_objects", "depth_clusters", data_type="ObjectMask[]")
         .build()
     )
 
