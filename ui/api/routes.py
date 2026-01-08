@@ -368,6 +368,111 @@ async def stream_stage(stage_id: str, state=Depends(get_app_state)):
     )
 
 
+@router.get("/pipeline/stages/{stage_id}/config")
+async def get_stage_config(stage_id: str, state=Depends(get_app_state)):
+    """Get current configuration for a pipeline stage.
+
+    Returns configurable parameters with their current values,
+    min/max ranges, and step sizes for UI sliders.
+    """
+    if stage_id == "segment":
+        if state.segmenter:
+            cfg = state.segmenter.config
+            return {
+                "stage_id": stage_id,
+                "configurable": True,
+                "config": {
+                    "conf_threshold": {
+                        "value": cfg.conf_threshold,
+                        "min": 0.05,
+                        "max": 0.95,
+                        "step": 0.05,
+                        "label": "Confidence Threshold",
+                        "description": "Minimum confidence for detections",
+                    },
+                    "iou_threshold": {
+                        "value": cfg.iou_threshold,
+                        "min": 0.1,
+                        "max": 0.9,
+                        "step": 0.05,
+                        "label": "IoU Threshold",
+                        "description": "NMS overlap threshold",
+                    },
+                    "max_detections": {
+                        "value": cfg.max_detections,
+                        "min": 1,
+                        "max": 50,
+                        "step": 1,
+                        "label": "Max Detections",
+                        "description": "Maximum objects per frame",
+                    },
+                    "min_area": {
+                        "value": cfg.min_area,
+                        "min": 100,
+                        "max": 10000,
+                        "step": 100,
+                        "label": "Min Area",
+                        "description": "Minimum mask area (pixels)",
+                    },
+                    "max_area": {
+                        "value": cfg.max_area,
+                        "min": 10000,
+                        "max": 500000,
+                        "step": 10000,
+                        "label": "Max Area",
+                        "description": "Maximum mask area (pixels)",
+                    },
+                },
+            }
+        else:
+            return {
+                "stage_id": stage_id,
+                "configurable": False,
+                "message": "Segmenter not initialized (Hailo unavailable)",
+                "config": {},
+            }
+
+    # Non-configurable stages
+    return {"stage_id": stage_id, "configurable": False, "config": {}}
+
+
+@router.post("/pipeline/stages/{stage_id}/config")
+async def update_stage_config(stage_id: str, update: dict, state=Depends(get_app_state)):
+    """Update configuration for a pipeline stage at runtime.
+
+    Changes take effect immediately on the next frame.
+    """
+    config_data = update.get("config", {})
+
+    if stage_id == "segment" and state.segmenter:
+        cfg = state.segmenter.config
+        updated = []
+
+        for key, value in config_data.items():
+            if hasattr(cfg, key):
+                setattr(cfg, key, value)
+                updated.append(key)
+
+        if updated:
+            return {
+                "success": True,
+                "message": f"Updated: {', '.join(updated)}",
+                "stage_id": stage_id,
+            }
+        else:
+            return {
+                "success": False,
+                "message": "No valid parameters to update",
+                "stage_id": stage_id,
+            }
+
+    return {
+        "success": False,
+        "message": f"Stage '{stage_id}' is not configurable",
+        "stage_id": stage_id,
+    }
+
+
 # =============================================================================
 # Object Endpoints
 # =============================================================================

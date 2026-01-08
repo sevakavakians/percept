@@ -343,6 +343,119 @@ function createArrowMarker() {
 }
 
 // =============================================================================
+// Stage Configuration Module
+// =============================================================================
+
+const stageConfig = {
+    currentStageId: null,
+    currentConfig: null,
+
+    async load(stageId) {
+        try {
+            const data = await api.get(`/pipeline/stages/${stageId}/config`);
+            this.currentStageId = stageId;
+            this.currentConfig = data;
+            return data;
+        } catch (error) {
+            console.error('Failed to load stage config:', error);
+            return null;
+        }
+    },
+
+    async save(stageId, config) {
+        try {
+            const response = await api.post(`/pipeline/stages/${stageId}/config`, { config });
+            if (response.success) {
+                this.showMessage('Configuration updated', 'success');
+            } else {
+                this.showMessage(response.message || 'Update failed', 'error');
+            }
+            return response;
+        } catch (error) {
+            this.showMessage('Failed to update config', 'error');
+            return null;
+        }
+    },
+
+    render(container, configData) {
+        if (!configData || !configData.configurable) {
+            const message = configData?.message || 'This stage has no configurable parameters';
+            container.innerHTML = `<p class="text-muted">${message}</p>`;
+            return;
+        }
+
+        let html = '<div class="stage-config-form">';
+        for (const [key, param] of Object.entries(configData.config)) {
+            const label = param.label || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            html += `
+                <div class="config-row">
+                    <label title="${param.description || ''}">${label}</label>
+                    <input type="range"
+                           id="config-${key}"
+                           min="${param.min}"
+                           max="${param.max}"
+                           step="${param.step}"
+                           value="${param.value}"
+                           oninput="stageConfig.onSliderChange('${key}', this.value)">
+                    <span id="config-${key}-value">${param.value}</span>
+                </div>
+            `;
+        }
+        html += `
+            <div class="config-actions">
+                <button onclick="stageConfig.apply()" class="btn btn-primary">Apply</button>
+                <button onclick="stageConfig.reset()" class="btn btn-secondary">Reset</button>
+            </div>
+            <div id="config-message" class="config-message"></div>
+        </div>`;
+        container.innerHTML = html;
+    },
+
+    onSliderChange(key, value) {
+        const valueEl = document.getElementById(`config-${key}-value`);
+        if (valueEl) {
+            valueEl.textContent = value;
+        }
+    },
+
+    async apply() {
+        if (!this.currentConfig || !this.currentConfig.config) return;
+
+        const config = {};
+        for (const [key, param] of Object.entries(this.currentConfig.config)) {
+            const input = document.getElementById(`config-${key}`);
+            if (input) {
+                config[key] = param.step < 1 ? parseFloat(input.value) : parseInt(input.value, 10);
+            }
+        }
+        await this.save(this.currentStageId, config);
+    },
+
+    async reset() {
+        if (!this.currentStageId) return;
+        const data = await this.load(this.currentStageId);
+        if (data) {
+            const container = document.getElementById('stage-config');
+            if (container) {
+                this.render(container, data);
+            }
+        }
+    },
+
+    showMessage(text, type = 'info') {
+        const el = document.getElementById('config-message');
+        if (el) {
+            el.textContent = text;
+            el.className = `config-message ${type}`;
+            setTimeout(() => {
+                el.textContent = '';
+                el.className = 'config-message';
+            }, 3000);
+        }
+    },
+};
+
+// =============================================================================
 // Pipeline Module
 // =============================================================================
 
@@ -452,11 +565,24 @@ const pipeline = {
                              class="stage-video"
                              onerror="this.style.display='none'" />
                     </div>
+                    <div class="stage-config-section">
+                        <h4>Configuration</h4>
+                        <div id="stage-config">
+                            <p class="text-muted">Loading configuration...</p>
+                        </div>
+                    </div>
                     <div class="stage-info">
                         <span class="text-muted">Module: ${node.module || 'N/A'}</span>
                     </div>
                 </div>
             `;
+
+            // Load and render stage configuration
+            const configData = await stageConfig.load(nodeId);
+            const configContainer = document.getElementById('stage-config');
+            if (configContainer && configData) {
+                stageConfig.render(configContainer, configData);
+            }
         }
     },
 };
